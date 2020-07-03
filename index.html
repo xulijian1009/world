@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="js/jquery.js"></script>
+    <script src="js/echarts.min.js"></script>
+    <script src="js/world.js"></script>
+    <script src="js/countryMap.js"></script>
+    <script src="js/sonic.js"></script>
+    <title>世界疫情数据</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body style="background: #172c3c">
+<div id="sumData">
+    <table style="margin: 20px auto;color: white";>
+        <tbody>
+        <tr>
+        </tr>
+        </tbody>
+    </table>
+</div>
+<div id="result"></div>
+<div style="text-align: center;">
+    <div class="btn wave right" id="currentBtn">现有确诊</div>
+    <div class="btn wave right" id="sumBtn">累计确诊</div>
+    <div class="btn wave right" id="deadBtn">死亡人数</div>
+    <div class="btn wave right" id="curedBtn">治愈人数</div>
+</div>
+<div id="loading"></div>
+<div id="map" style="width: 1200px;height:700px;margin: 0 auto;">
+
+</div>
+
+<script>
+    //添加加载进度条
+    let loading = new Sonic({
+        width: 100,
+        height: 100,
+        fillColor: '#ffffff',
+        stepsPerFrame: 7,
+        trailLength: 0.7,
+        pointDistance: 0.01,
+        setup: function () {
+            this._.lineWidth = 10;
+        },
+
+        fps: 30,
+        path: [
+            ['line', 20, 70, 50, 20],
+            ['line', 50, 20, 80, 70],
+            ['line', 80, 70, 20, 70]
+        ]
+    });
+    loading.play();
+
+    $("#loading").append(loading.canvas);
+</script>
+
+<script>
+
+
+    //初始化echarts
+    const myChart = echarts.init(document.getElementById('map'));
+    console.log("初始化");
+
+    initChart();
+    console.log("初始化结束");
+
+    // 页面需引入jquery库
+    const APIKEY = "1531150663469519b4bf4e6ba73a5e08"
+
+    $(document).ready(function () {
+        let result = {};
+        let get1 = $.get("http://api.tianapi.com/txapi/ncovabroad/index?key=" + APIKEY,
+            function (data, status) {
+                // console.log(data);
+                result['today']=data;
+
+                let currentData = [];
+                let sumData = [];
+                let deadData = [];
+                let curedData = [];
+                for (let i of data.newslist) {
+                    currentData.push({"name": i.provinceName, "value": i.currentConfirmedCount});
+                    sumData.push({"name": i.provinceName, "value": i.confirmedCount});
+                    deadData.push({"name": i.provinceName, "value": i.deadCount});
+                    curedData.push({"name": i.provinceName, "value": i.curedCount});
+                }
+
+                let countryArray = getCountryArray();
+
+                for (let country of countryArray) {
+                    if (!countryMap.hasOwnProperty(country)) {
+                        currentData.push({"name": country, "value": 0});
+                        sumData.push({"name": country, "value": 0});
+                        deadData.push({"name": country, "value": 0});
+                        curedData.push({"name": country, "value": 0});
+                    } else {
+                        let key = countryMap[country];
+                        if (!currentData.hasOwnProperty(key)) {
+                            currentData.push({"name": key, "value": 0});
+                            sumData.push({"name": key, "value": 0});
+                            deadData.push({"name": key, "value": 0});
+                            curedData.push({"name": key, "value": 0});
+                        }
+                    }
+                }
+
+                let pieces1 = [{
+                    lte: 0,
+                    label: "0",
+                    color: "#ffffff"
+                }, {
+                    min: 1,
+                    max: 99,
+                    color: "#ff9985"
+                }, {
+                    min: 100,
+                    max: 999,
+                    color: "#f57567"
+                }, {
+                    min: 1000,
+                    max: 9999,
+                    color: "#e64546"
+                }, {
+                    min: 10000,
+                    max: 99999,
+                    color: "#b80909"
+                }, {
+                    min: 100000,
+                    label: "≥100000",
+                    color: "#8A0808"
+                }];
+
+                refreshChart(currentData, "现有确诊", pieces1);
+
+                $("#currentBtn").click(function () {
+                    refreshChart(currentData, "现有确诊", pieces1)
+                });
+
+                $("#sumBtn").click(function () {
+                    refreshChart(sumData, "累计确诊", pieces1)
+                });
+                $("#deadBtn").click(function () {
+                    refreshChart(deadData, "死亡人数", [{
+                        lte: 0,
+                        label: "0",
+                        color: "#ffffff"
+                    }, {
+                        min: 1,
+                        max: 99,
+                        color: "#868686"
+                    }, {
+                        min: 100,
+                        max: 999,
+                        color: "#6d6d6d"
+                    }, {
+                        min: 1000,
+                        max: 9999,
+                        color: "#5c5c5c"
+                    }, {
+                        min: 10000,
+                        max: 99999,
+                        color: "#343434"
+                    }, {
+                        min: 100000,
+                        label: "≥100000",
+                        color: "#232323"
+                    }])
+                });
+                $("#curedBtn").click(function () {
+                    refreshChart(curedData, "治愈人数", [{
+                        lte: 0,
+                        label: "0",
+                        color: "#ffffff"
+                    }, {
+                        min: 1,
+                        max: 99,
+                        color: "#c2ffc2"
+                    }, {
+                        min: 100,
+                        max: 999,
+                        color: "#9cff91"
+                    }, {
+                        min: 1000,
+                        max: 9999,
+                        color: "#40ff30"
+                    }, {
+                        min: 10000,
+                        max: 99999,
+                        color: "#149000"
+                    }, {
+                        min: 100000,
+                        label: "≥100000",
+                        color: "#007d00"
+                    }])
+                });
+            });
+        //获取昨天的数据
+        let get2 = $.get("http://api.tianapi.com/txapi/ncovabroad/index?key=" + APIKEY + "&date=" + getDay(-1),
+            function (data, status) {
+            result['yesterday']=data;
+        });
+
+        //两个请求全部执行完，计算世界总计疫情数
+        $.when(get1,get2).done(function () {
+            getSumData(result.today,result.yesterday);
+            stopLoading();
+        });
+    });
+
+
+    //获取地图上所有国家
+    function getCountryArray() {
+        let countryArray = [];
+
+        for (let country of echarts.getMap("world").geoJson.features) {
+            countryArray.push(country.properties.name);
+        }
+        return countryArray;
+    }
+
+    //异步刷新数据
+    function refreshChart(data, title, pieces) {
+
+        myChart.setOption({
+            title: {
+                text: "全球疫情数据-" + title
+            },
+            visualMap: {
+                pieces: pieces
+            },
+            series: [
+                {
+                    name: title,
+                    type: 'map',
+                    mapType: 'world',
+                    emphasis: {
+                        label: {show: false}
+                    },
+                    nameMap: countryMap,
+                    data: data
+                }
+            ]
+        })
+    }
+
+    //生成图表
+    function initChart() {
+        let option = {
+            title: {
+                text: "全球疫情数据-现有确诊",
+                left: "center",
+                textStyle: {
+                    color: "#ffffff"
+                }
+            },
+            textStyle: {
+                color: "#ffffff"
+            },
+            visualMap: {
+                type: "piecewise",
+                textStyle: {
+                    color: "#ffffff"
+                }
+            },
+            tooltip: {
+                textStyle: {
+                    color: "#ffffff"
+                }
+            }
+        };
+
+        myChart.setOption(option);
+
+    }
+
+    //获取汇总数据
+    function getSumData(todayData, yesterdayData) {
+        let tr = $("#sumData").find("tr").first();
+        let sumTodayData = sum(todayData);
+        let sumYesterdayData = sum(yesterdayData);
+        console.log(sumYesterdayData);
+
+        tr.append("<td>" +
+            "                <div>" +
+            "                    <h3>现有确诊</h3>" +
+            "                    <h2 class='sumCurrentConfirmed'>" + sumTodayData.currentConfirmed + "</h2>" +
+            "                    <p>昨日<span class='sumCurrentConfirmed'>" + formatAdd(sumTodayData.currentConfirmed - sumYesterdayData.currentConfirmed) + "</span></p>" +
+            "                </div>" +
+            "            </td>");
+        tr.append("<td>" +
+            "                <div>" +
+            "                    <h3>累计确诊</h3>" +
+            "                    <h2 class='sumConfirmed'>" + sumTodayData.confirmed + "</h2>" +
+            "                    <p>昨日<span class='sumConfirmed'>" + formatAdd(sumTodayData.confirmed - sumYesterdayData.confirmed) + "</span></p>" +
+            "                </div>" +
+            "            </td>");
+        tr.append("<td>" +
+            "                <div>" +
+            "                    <h3>累计治愈</h3>" +
+            "                    <h2 class='sumCured'>" + sumTodayData.cured + "</h2>" +
+            "                    <p>昨日<span class='sumCured'>" + formatAdd(sumTodayData.cured - sumYesterdayData.cured) + "</span></p>" +
+            "                </div>" +
+            "            </td>");
+        tr.append("<td>" +
+            "                <div>" +
+            "                    <h3>累计死亡</h3>" +
+            "                    <h2 class='sumDead'>" + sumTodayData.dead + "</h2>" +
+            "                    <p>昨日<span class='sumDead'>" + formatAdd(sumTodayData.dead - sumYesterdayData.dead) + "</span></p>" +
+            "                </div>" +
+            "            </td>");
+
+    }
+    function formatAdd(num) {
+        return num>=0?"+"+num:""+num;
+    }
+    function SumData(currentConfirmed, confirmed, cured, dead) {
+        this.currentConfirmed = currentConfirmed;
+        this.confirmed = confirmed;
+        this.cured = cured;
+        this.dead = dead;
+    }
+
+    function stopLoading() {
+        $("#loading").remove();
+    }
+    function sum(data) {
+        let sumData = new SumData(0, 0, 0, 0);
+        for (let i of data.newslist) {
+            sumData.currentConfirmed += i.currentConfirmedCount;
+            sumData.confirmed += i.confirmedCount;
+            sumData.dead += i.deadCount;
+            sumData.cured += i.curedCount;
+        }
+        return sumData;
+    }
+
+    function getDay(num) {
+        let date = new Date();
+        date.setTime(date.getTime() + num * 24 * 60 * 60 * 1000);
+        return date.getFullYear() + "-" + format(date.getMonth() + 1) + "-" + format(date.getDate());
+    }
+
+    function format(a) {
+        return a < 10 ? "0" + a : "" + a;
+    }
+</script>
+</body>
+</html>
